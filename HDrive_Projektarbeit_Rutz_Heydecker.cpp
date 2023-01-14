@@ -11,6 +11,10 @@
 // Autor        : Björn Rutz & Jan Heydecker
 // Version      : 1.0
 
+// Version      : 2.0
+// Aenderung    : Die Hilfsvariablen der ButtenState konnten Rausgenommen werden,
+//              : jedoch wird nun ein Sleep von 1ms benötigt, damit nicht während dem Senden das Telegramm überschrieben wird.
+
 // **********************************************************************************************************************************************************************
 
 
@@ -40,19 +44,13 @@ int main(void) {
     string SERVERADDRESS;                                       // server adresse, der User muss diese einfügen
     const int MESSAGELENGTH = 512;                              // max Länger der Nachricht
     string stringTelegramm;                                     // Telegramm wird später im Code definiert
-
+    
     SOCKET tcpSocket;                                           // Socket Objekt erstellen, benötigt für socket()
     struct sockaddr_in serverAdress, clientAddress;             // Structs in denen wir die Daten zum Server und Client Speichern
     int slen;                                                   // Variable gebraucht in sendto()
     char message[MESSAGELENGTH];                                // in message speichern wir die erhaltenen/versendeten Daten
     WSADATA wsaData;                                            // WSADATA Objekt, benötigt für WSAStartup()
     slen = sizeof(clientAddress);                               // Länge der Client Adresse, gebruacht in sendto()
-
-    // Deffinition der Hilfsvariablen
-    bool buttenWState = true;                                   // Status Taste W
-    bool buttenWLastState = buttenWState;                       // letzer status Taste W
-    bool buttenSState = true;                                   // Status Taste S
-    bool buttenSLastState = buttenWState;                       // letzer status Taste S
 
     // Port und IP-Adresse einlesen 
     cout << "Bitte Motor IP eingeben" << endl;
@@ -95,46 +93,24 @@ int main(void) {
     cout << "W -> Drehung Rechts" << endl;
     cout << "S -> Drehung Links" << endl;
     cout << "A -> Programm beenden" << endl;
-
+    
     // Gewährleistet das dauerhafte Senden und schliesst nicht nach Empfang einer Nachricht
     while (!(GetAsyncKeyState('A') & 0x8000)) {
         // Programmteil für den Rechtslauf
         if (GetAsyncKeyState('W') & 0x8000) {
-            // Setze die Hilfsvariable buttenWState auf false
-            buttenWState = false;
-
-            if ((buttenWState == false) && (buttenWLastState != buttenWState)) {
-                // Setze die Hilfsvariable buttenWLastState gleich dem buttenWState
-                buttenWLastState = buttenWState;
-
-                // Telegramm für den Rechtslauf
-                stringTelegramm = "<control pos = \"0\" speed = \"5000\" torque = <\"8000\" mode = \"128\" acc = \"200000\" decc = \"1\" / >";
-            }
+            // Telegramm für den Rechtslauf
+            stringTelegramm = "<control pos = \"0\" speed = \"5000\" torque = <\"8000\" mode = \"128\" acc = \"200000\" decc = \"1\" / >";
         }
 
         // Programmteil für den Linkslauf
         else if (GetAsyncKeyState('S') & 0x8000) {
-            // Setze die Hilfsvariable buttenSState auf false
-            buttenSState = false;
-
-            if ((buttenSState == false) && (buttenSLastState != buttenSState)) {
-                // Setze die Hilfsvariable buttenSLastState gleich dem buttenSState
-                buttenSLastState = buttenSState;
-
-                // Telegramm für den Linkslauf
-                stringTelegramm = "<control pos = \"100000\" speed = \"5000\" torque = <\"-8000\" mode = \"128\" acc = \"200000\" decc = \"1\" / >";
-            }
+            // Telegramm für den Linkslauf
+            stringTelegramm = "<control pos = \"100000\" speed = \"5000\" torque = <\"-8000\" mode = \"128\" acc = \"200000\" decc = \"1\" / >";
         }
 
-        // Programmteil für das Stoppen des Antriebs
-        else if (((buttenWState == false) && (buttenWLastState == buttenWState)) || ((buttenSState == false) && (buttenSLastState == buttenSState))) {
-            // Setze alle Hilfsvariablen auf True
-            buttenSState = true;
-            buttenSLastState = true;
-            buttenWState = true;
-            buttenWLastState = true;
-
-            // Telegramm für das Stoppen des Antriebs
+        // Programmteil für den Stopp
+        else {
+            // Telegramm für den Stopp
             stringTelegramm = "<control pos = \"0\" speed = \"5000\" torque = <\"8000\" mode = \"0\" acc = \"200000\" decc = \"1\" / >";
         }
 
@@ -143,12 +119,15 @@ int main(void) {
         for (int i = 0; i < stringTelegramm.length() + 1; i++) {
             charTelegramm[i] = stringTelegramm[i];
         }
-
+ 
         // Senden des Telegramms mit dem Datentyp Char
         if (send(tcpSocket, charTelegramm, strlen(message), 0) == SOCKET_ERROR) {
             cout << "Daten senden fehlgeschlagen: " << WSAGetLastError() << endl;
             return 1;
         }
+        
+        // Wird hier benötigt damit das Telegramm zuerst verschickt wird, bevor die Umwandlung des Telegramms wieder startet
+        Sleep(1);
     }
 
     // Schliesse den TCP Socket
